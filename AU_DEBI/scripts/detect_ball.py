@@ -6,9 +6,13 @@ import cv2
 import rospy
 from sensor_msgs.msg import Image
 from  ros_numpy import numpify
+from ultralytics import YOLO
 
 class Percept():
     def __init__(self):
+        self.model = YOLO("src/AU_DEBI/weights/gazebo1.pt")
+        self.colors = [(50, 50, 255), (255, 50, 50), (50, 255, 50), (180, 100, 180)]
+
         rospy.Subscriber('/camera/rgb/image_raw', Image, self.callback)
         rospy.loginfo("Finish Initialization of Node ")
 
@@ -19,9 +23,32 @@ class Percept():
         '''
         rospy.loginfo("Receicing Video Frame")
         self.frame = numpify(data)
-        # print(frame)
-        # print(frame.shape)
-        self.contour()
+        self.yolo()
+
+    def yolo(self, iou=0.5, conf=0.5, duration=1000,classes=[0, 1, 2], save=False, log_path="Perception/logs"):
+        '''
+        ABOUT: 
+            This function is for display frame with detection on it
+            for debugging
+        '''
+        frame = self.frame
+        results = self.model.predict(frame, iou=iou, conf=conf, classes=classes, show=True)   #infer frame objects
+        result = list(results)[0]
+        boxes  =  result.boxes
+        for box in boxes:
+            xyxy = box.xyxy[0].numpy().astype('int16')
+            cls  = box.cls.numpy()
+            print(xyxy, cls)
+          
+        if save:
+            cv2.imwrite(f"{log_path}/img_{time.time()}.jpg", frame)
+
+    # def yolo(self, classes=[0], iou=0.25, conf=0.5):
+    #     frame = self.frame
+    #     results = self.model.predict(frame, classes=classes, iou=iou, conf=conf)
+    #     result = list(results)[0]
+    #     return result.boxes.numpy()
+        
     
     def hough_circle(self):
         img = self.frame.copy()
